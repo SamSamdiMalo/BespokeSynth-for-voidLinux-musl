@@ -24,7 +24,7 @@ jobs:
       # 2. Clonar el código fuente oficial de BespokeSynth con sus submódulos
       - name: Clonar código fuente y submódulos
         run: |
-          git clone --recursive https://github.com
+          git clone --recursive https://github.com/BespokeSynth/BespokeSynth.git
 
       # 3. PARCHE CRÍTICO MUSL: Forzar la anulación de execinfo.h en JUCE
       - name: Parchear JUCE para entorno Musl

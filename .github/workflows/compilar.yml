@@ -12,28 +12,28 @@ jobs:
       image: alpine:latest
 
     steps:
-      # 1. Instalar dependencias críticas ANTES de clonar el código
+      # 1. Instalar dependencias críticas de audio y sistema gráfico
       - name: Instalar herramientas esenciales y dependencias de audio
         run: |
           apk update
           apk add --no-cache cmake g++ git make python3-dev \
             alsa-lib-dev jack-dev libx11-dev libxrandr-dev \
             libxinerama-dev libxcursor-dev freetype-dev curl-dev \
-            nodejs bash
+            nodejs bash libxext-dev libxrender-dev libxi-dev glib-dev
 
-      # 2. Clonar de forma manual y nativa para evitar fallos de Node en el contenedor
+      # 2. Clonar de forma manual y nativa con todos sus submódulos de audio
       - name: Clonar código fuente y submódulos
         run: |
           git clone --recursive https://github.com/BespokeSynth/BespokeSynth.git
           
-      # 3. Configurar el entorno con CMake apuntando a la carpeta clonada
+      # 3. Configurar el entorno con CMake apuntando a la carpeta correcta
       - name: Configurar CMake
         run: |
-          cmake -S src -B build \
+          cmake -S BespokeSynth -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBESPOKE_BUILD_AUTO_UPDATER=OFF
 
-      # 4. Compilar el binario nativo Musl
+      # 4. Compilar el binario nativo Musl en paralelo
       - name: Compilar ejecutable
         run: cmake --build build --config Release -j4
 
@@ -41,7 +41,7 @@ jobs:
       - name: Preparar paquete de distribución
         run: |
           mkdir -p dist
-          cp -r build/BespokeSynth_artefacts/Release/* dist/
+          cp -r build/Source/BespokeSynth_artefacts/Release/* dist/ || cp -r build/BespokeSynth_artefacts/Release/* dist/ || cp -r build/Source/BespokeSynth_artefacts/* dist/
           tar -czvf bespokesynth-void-musl.tar.gz -C dist .
 
       # 6. Subir el artefacto a GitHub Actions de respaldo

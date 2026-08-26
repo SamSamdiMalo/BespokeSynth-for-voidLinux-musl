@@ -12,26 +12,30 @@ jobs:
       image: alpine:latest
 
     steps:
-      # 1. Instalar dependencias críticas de audio y sistema gráfico
+      # 1. Instalar dependencias, incluyendo libexecinfo para resolver execinfo.h
+      # También añadimos mesa-dev (GL) y gtk+3.0-dev para el entorno gráfico de JUCE
       - name: Instalar herramientas esenciales y dependencias de audio
         run: |
           apk update
           apk add --no-cache cmake g++ git make python3-dev \
             alsa-lib-dev jack-dev libx11-dev libxrandr-dev \
             libxinerama-dev libxcursor-dev freetype-dev curl-dev \
-            nodejs bash libxext-dev libxrender-dev libxi-dev glib-dev
+            nodejs bash libxext-dev libxrender-dev libxi-dev glib-dev \
+            libexecinfo-dev mesa-dev gtk+3.0-dev webkit2gtk-dev
 
-      # 2. Clonar de forma manual y nativa con todos sus submódulos de audio
+      # 2. Clonar de forma manual y nativa con todos sus submódulos
       - name: Clonar código fuente y submódulos
         run: |
           git clone --recursive https://github.com/BespokeSynth/BespokeSynth.git
           
-      # 3. Configurar el entorno con CMake apuntando a la carpeta correcta
+      # 3. Configurar con CMake inyectando libexecinfo para corregir a juceaide
       - name: Configurar CMake
         run: |
           cmake -S BespokeSynth -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DBESPOKE_BUILD_AUTO_UPDATER=OFF
+            -DBESPOKE_BUILD_AUTO_UPDATER=OFF \
+            -DCMAKE_EXE_LINKER_FLAGS="-lexecinfo" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-lexecinfo"
 
       # 4. Compilar el binario nativo Musl en paralelo
       - name: Compilar ejecutable

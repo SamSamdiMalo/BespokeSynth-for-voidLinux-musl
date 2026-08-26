@@ -7,37 +7,63 @@ jobs:
   build-musl:
     runs-on: ubuntu-latest
 
-    # Metemos un contenedor nativo de Musl (Alpine) dentro del servidor
+    # Usamos un contenedor nativo de Musl (Alpine)
     container:
       image: alpine:latest
 
     steps:
-      - name: Instalar herramientas y dependencias en entorno Musl
+      # 1. Instalar dependencias críticas ANTES de clonar el código
+      - name: Instalar herramientas esenciales y dependencias de audio
         run: |
           apk update
           apk add --no-cache cmake g++ git make python3-dev \
             alsa-lib-dev jack-dev libx11-dev libxrandr-dev \
-            libxinerama-dev libxcursor-dev freetype-dev curl-dev
+            libxinerama-dev libxcursor-dev freetype-dev curl-dev \
+            nodejs bash
 
-      - name: Clonar BespokeSynth
-        uses: actions/checkout@v4
-        with:
-          repository: 'BespokeSynth/BespokeSynth'
-          submodules: 'recursive'
-
+      # 2. Clonar de forma manual y nativa para evitar fallos de Node en el contenedor
+      - name: Clonar código fuente y submódulos
+        run: |
+          git clone --recursive https://github.com src
+          
+      # 3. Configurar el entorno con CMake apuntando a la carpeta clonada
       - name: Configurar CMake
         run: |
-          cmake -B build \
+          cmake -S src -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBESPOKE_BUILD_AUTO_UPDATER=OFF
 
-      - name: Compilar ejecutable nativo
+      # 4. Compilar el binario nativo Musl
+      - name: Compilar ejecutable
         run: cmake --build build --config Release -j4
 
-      - name: Guardar binario Musl terminado
+      # 5. Empaquetar el resultado en un archivo tar.gz listo para distribuir
+      - name: Preparar paquete de distribución
+        run: |
+          mkdir -p dist
+          cp -r build/BespokeSynth_artefacts/Release/* dist/
+          tar -czvf bespokesynth-void-musl.tar.gz -C dist .
+
+      # 6. Subir el artefacto a GitHub Actions de respaldo
+      - name: Guardar copia en Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: BespokeSynth-Void-Musl
-          path: |
-            build/BespokeSynth_artefacts/Release/
-            
+          path: bespokesynth-void-musl.tar.gz
+
+      # 7. Crear un Release público automáticamente con el binario listo
+      - name: Crear Release Público Permanente
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: v${{ github.run_number }}-musl
+          name: BespokeSynth Nativo para Musl (Build #${{ github.run_number }})
+          body: |
+            Binario nativo de BespokeSynth compilado dinámicamente en entorno Musl (Alpine/Void Linux).
+            ¡No requiere gcompat ni capas de traducción!
+          draft: false
+          prerelease: false
+          files: bespokesynth-void-musl.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          

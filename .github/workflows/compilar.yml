@@ -24,7 +24,7 @@ jobs:
       # 2. Clonar de forma manual y nativa para evitar fallos de Node en el contenedor
       - name: Clonar código fuente y submódulos
         run: |
-          git clone --recursive https://github.com src
+          git clone --recursive https://github.com/BespokeSynth/BespokeSynth.git src
           
       # 3. Configurar el entorno con CMake apuntando a la carpeta clonada
       - name: Configurar CMake

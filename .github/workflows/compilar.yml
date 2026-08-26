@@ -7,13 +7,11 @@ jobs:
   build-musl:
     runs-on: ubuntu-latest
 
-    # Usamos un contenedor nativo de Musl (Alpine)
     container:
       image: alpine:latest
 
     steps:
-      # 1. Instalar dependencias, incluyendo libexecinfo para resolver execinfo.h
-      # También añadimos mesa-dev (GL) y gtk+3.0-dev para el entorno gráfico de JUCE
+      # 1. Instalar dependencias usando los nombres de paquetes modernos de Alpine
       - name: Instalar herramientas esenciales y dependencias de audio
         run: |
           apk update
@@ -21,41 +19,41 @@ jobs:
             alsa-lib-dev jack-dev libx11-dev libxrandr-dev \
             libxinerama-dev libxcursor-dev freetype-dev curl-dev \
             nodejs bash libxext-dev libxrender-dev libxi-dev glib-dev \
-            libexecinfo-dev mesa-dev gtk+3.0-dev webkit2gtk-dev
+            mesa-dev gtk+3.0-dev webkit2gtk-4.1-dev
 
-      # 2. Clonar de forma manual y nativa con todos sus submódulos
+      # 2. Clonar el repositorio oficial
       - name: Clonar código fuente y submódulos
         run: |
           git clone --recursive https://github.com/BespokeSynth/BespokeSynth.git
           
-      # 3. Configurar con CMake inyectando libexecinfo para corregir a juceaide
+      # 3. Configurar inyectando los parámetros para evitar buscar execinfo.h
       - name: Configurar CMake
         run: |
           cmake -S BespokeSynth -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBESPOKE_BUILD_AUTO_UPDATER=OFF \
-            -DCMAKE_EXE_LINKER_FLAGS="-lexecinfo" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-lexecinfo"
+            -DCMAKE_CXX_FLAGS="-DJUCE_ALLOW_STATIC_BACKTRACE=0" \
+            -DCMAKE_C_FLAGS="-DJUCE_ALLOW_STATIC_BACKTRACE=0"
 
       # 4. Compilar el binario nativo Musl en paralelo
       - name: Compilar ejecutable
         run: cmake --build build --config Release -j4
 
-      # 5. Empaquetar el resultado en un archivo tar.gz listo para distribuir
+      # 5. Empaquetar el resultado para distribución
       - name: Preparar paquete de distribución
         run: |
           mkdir -p dist
           cp -r build/Source/BespokeSynth_artefacts/Release/* dist/ || cp -r build/BespokeSynth_artefacts/Release/* dist/ || cp -r build/Source/BespokeSynth_artefacts/* dist/
           tar -czvf bespokesynth-void-musl.tar.gz -C dist .
 
-      # 6. Subir el artefacto a GitHub Actions de respaldo
+      # 6. Guardar copia en Artifacts de respaldo
       - name: Guardar copia en Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: BespokeSynth-Void-Musl
           path: bespokesynth-void-musl.tar.gz
 
-      # 7. Crear un Release público automáticamente con el binario listo
+      # 7. Crear el Release público
       - name: Crear Release Público Permanente
         uses: softprops/action-gh-release@v2
         if: success()

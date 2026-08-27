@@ -19,7 +19,7 @@ jobs:
             alsa-lib-dev jack-dev libx11-dev libxrandr-dev \
             libxinerama-dev libxcursor-dev freetype-dev curl-dev \
             nodejs bash libxext-dev libxrender-dev libxi-dev glib-dev \
-            mesa-dev gtk+3.0-dev webkit2gtk-4.1-dev
+            mesa-dev gtk+3.0-dev webkit2gtk-4.1-dev libexecinfo-dev
 
       # 2. Clonar el código fuente oficial de BespokeSynth con sus submódulos
       - name: Clonar código fuente y submódulos

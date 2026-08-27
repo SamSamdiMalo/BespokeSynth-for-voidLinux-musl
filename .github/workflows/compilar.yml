@@ -10,72 +10,55 @@ jobs:
   build-musl:
     runs-on: ubuntu-latest
 
-    container:
-      image: ghcr.io/void-linux/void-musl:latest
-
     steps:
-      # 1. Instalar herramientas esenciales, dependencias Y gcompat
-      - name: Instalar herramientas esenciales y dependencias de audio
-        run: |
-          xbps-install -Syu || xbps-install -Syu
-          xbps-install -y git cmake gcc make pkg-config python3 python3-devel \
-            alsa-lib-devel jack-devel libX11-devel libXrandr-devel \
-            libXinerama-devel libXcursor-devel freetype-devel libcurl-devel \
-            nodejs bash libXext-devel libXrender-devel libXi-devel glib-devel \
-            MesaLib-devel gtk+3-devel libwebkit2gtk41-devel libexecinfo-devel \
-            findutils sed tar gzip gcompat
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
 
-      # 2. Clonar el código fuente oficial de BespokeSynth con sus submódulos
-      - name: Clonar código fuente y submódulos
+      - name: Compilar BespokeSynth dentro de Void Linux Musl
         run: |
-          git clone --recursive https://github.com/BespokeSynth/BespokeSynth.git
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace ghcr.io/void-linux/void-musl:latest sh -c "
+            set -e
+            
+            # 1. Instalar dependencias dentro del contenedor Musl
+            xbps-install -Syu || xbps-install -Syu
+            xbps-install -y git cmake gcc make pkg-config python3 python3-devel \
+              alsa-lib-devel jack-devel libX11-devel libXrandr-devel \
+              libXinerama-devel libXcursor-devel freetype-devel libcurl-devel \
+              nodejs bash libXext-devel libXrender-devel libXi-devel glib-devel \
+              MesaLib-devel gtk+3-devel libwebkit2gtk41-devel libexecinfo-devel \
+              findutils sed tar gzip
 
-      # 3. PARCHE CRÍTICO MUSL: Limpiar dependencias incompatibles de glibc
-      - name: Parchear JUCE para entorno Musl
-        run: |
-          cd BespokeSynth/libs/JUCE
-          
-          # A. Evitar que busque sysctl.h (No existe en Musl puro)
-          find . -type f -name "juce_SystemStats_linux.cpp" -exec sed -i 's/#include <sys\/sysctl.h>/\/\/ #include <sys\/sysctl.h>/g' {} +
-          
-          # B. Musl no tiene las constantes GNU para locales; le decimos que devuelva un String vacío
-          find . -type f -name "juce_SystemStats_linux.cpp" -exec sed -i 's/getLocaleValue (_NL_ADDRESS_LANG_AB)/String()/g' {} +
-          find . -type f -name "juce_SystemStats_linux.cpp" -exec sed -i 's/getLocaleValue (_NL_ADDRESS_COUNTRY_AB2)/String()/g' {} +
-          
-          # C. Musl usa 'stat' nativamente para 64 bits, no necesita 'stat64' de glibc
-          find . -type f -name "juce_SharedCode_posix.h" -exec sed -i 's/stat64/stat/g' {} +
-      
-      # 4. Configurar el entorno limpio con CMake
-      - name: Configurar CMake
-        run: |
-          export CFLAGS="-Wno-error -Wno-unused-function"
-          export CXXFLAGS="-Wno-error -Wno-unused-function"
-          export LDFLAGS="-lexecinfo"
-          
-          cmake -S BespokeSynth -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBESPOKE_BUILD_AUTO_UPDATER=OFF
-      
-      # 5. Compilar el ejecutable nativo en paralelo (4 hilos)
-      - name: Compilar ejecutable
-        run: cmake --build build --config Release -j4
+            # 2. Clonar código fuente y submódulos
+            git clone --recursive https://github.com/BespokeSynth/BespokeSynth.git
 
-      # 6. Empaquetar los binarios listos en un archivo tar.gz
-      - name: Preparar paquete de distribución
-        run: |
-          mkdir -p dist
-          cp -r build/Source/BespokeSynth_artefacts/Release/* dist/ || cp -r build/BespokeSynth_artefacts/Release/* dist/ || cp -r build/Source/BespokeSynth_artefacts/* dist/
-          tar -czvf bespokesynth-void-musl.tar.gz -C dist .
+            # 3. Aplicar parches de JUCE para Musl
+            cd BespokeSynth/libs/JUCE
+            find . -type f -name 'juce_SystemStats_linux.cpp' -exec sed -i 's/#include <sys\/sysctl.h>/\/\/ #include <sys\/sysctl.h>/g' {} +
+            find . -type f -name 'juce_SystemStats_linux.cpp' -exec sed -i 's/getLocaleValue (_NL_ADDRESS_LANG_AB)/String()/g' {} +
+            find . -type f -name 'juce_SystemStats_linux.cpp' -exec sed -i 's/getLocaleValue (_NL_ADDRESS_COUNTRY_AB2)/String()/g' {} +
+            find . -type f -name 'juce_SharedCode_posix.h' -exec sed -i 's/stat64/stat/g' {} +
+            cd ../../..
 
-      # 7. Subir el artefacto a las Actions como respaldo temporal
+            # 4. Configurar y compilar
+            export CFLAGS='-Wno-error -Wno-unused-function'
+            export CXXFLAGS='-Wno-error -Wno-unused-function'
+            export LDFLAGS='-lexecinfo'
+
+            cmake -S BespokeSynth -B build -DCMAKE_BUILD_TYPE=Release -DBESPOKE_BUILD_AUTO_UPDATER=OFF
+            cmake --build build --config Release -j4
+
+            # 5. Empaquetar
+            mkdir -p dist
+            cp -r build/Source/BespokeSynth_artefacts/Release/* dist/ || cp -r build/BespokeSynth_artefacts/Release/* dist/ || cp -r build/Source/BespokeSynth_artefacts/* dist/
+            tar -czvf bespokesynth-void-musl.tar.gz -C dist .
+          "
+
       - name: Guardar copia en Artifacts
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: BespokeSynth-Void-Musl
           path: ${{ github.workspace }}/bespokesynth-void-musl.tar.gz
 
-      # 8. Generar el Release público permanente en la portada del repositorio
       - name: Crear Release Público Permanente
         uses: softprops/action-gh-release@v2
         with:
@@ -83,7 +66,7 @@ jobs:
           name: BespokeSynth Nativo para Musl (Build #${{ github.run_number }})
           body: |
             Binario nativo de BespokeSynth compilado de forma nativa en Void Linux Musl.
-            ¡No requiere gcompat ni capas de traducción secundarias para ejecutarse en tu sistema!
+            ¡No requiere gcompat ni capas de traducción secundarias!
           draft: false
           prerelease: false
           files: ${{ github.workspace }}/bespokesynth-void-musl.tar.gz

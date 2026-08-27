@@ -14,7 +14,7 @@ jobs:
       image: ghcr.io/void-linux/void-musl:latest
 
     steps:
-      # 1. Actualizar el sistema e instalar herramientas de Void Linux
+      # 1. Instalar herramientas esenciales, dependencias Y gcompat
       - name: Instalar herramientas esenciales y dependencias de audio
         run: |
           xbps-install -Syu || xbps-install -Syu
@@ -23,7 +23,7 @@ jobs:
             libXinerama-devel libXcursor-devel freetype-devel libcurl-devel \
             nodejs bash libXext-devel libXrender-devel libXi-devel glib-devel \
             MesaLib-devel gtk+3-devel libwebkit2gtk41-devel libexecinfo-devel \
-            findutils sed tar gzip
+            findutils sed tar gzip gcompat
 
       # 2. Clonar el código fuente oficial de BespokeSynth con sus submódulos
       - name: Clonar código fuente y submódulos
@@ -67,7 +67,7 @@ jobs:
           cp -r build/Source/BespokeSynth_artefacts/Release/* dist/ || cp -r build/BespokeSynth_artefacts/Release/* dist/ || cp -r build/Source/BespokeSynth_artefacts/* dist/
           tar -czvf bespokesynth-void-musl.tar.gz -C dist .
 
-      # 7. Subir el artefacto a las Actions como respaldo temporal (No bloqueante)
+      # 7. Subir el artefacto a las Actions como respaldo temporal
       - name: Guardar copia en Artifacts
         uses: actions/upload-artifact@v4
         continue-on-error: true
@@ -83,7 +83,7 @@ jobs:
           name: BespokeSynth Nativo para Musl (Build #${{ github.run_number }})
           body: |
             Binario nativo de BespokeSynth compilado de forma nativa en Void Linux Musl.
-            ¡No requiere gcompat ni capas de traducción secundarias!
+            ¡No requiere gcompat ni capas de traducción secundarias para ejecutarse en tu sistema!
           draft: false
           prerelease: false
           files: ${{ github.workspace }}/bespokesynth-void-musl.tar.gz

@@ -32,8 +32,16 @@ jobs:
       - name: Parchear JUCE para entorno Musl
         run: |
           cd BespokeSynth/libs/JUCE
-          # 1. Evitar que busque sysctl.h (No existe en Musl puro)
+          
+          # A. Evitar que busque sysctl.h (No existe en Musl puro)
           find . -type f -name "juce_SystemStats_linux.cpp" -exec sed -i 's/#include <sys\/sysctl.h>/\/\/ #include <sys\/sysctl.h>/g' {} +
+          
+          # B. Musl no tiene las constantes GNU para locales; le decimos que devuelva un String vacío
+          find . -type f -name "juce_SystemStats_linux.cpp" -exec sed -i 's/getLocaleValue (_NL_ADDRESS_LANG_AB)/String()/g' {} +
+          find . -type f -name "juce_SystemStats_linux.cpp" -exec sed -i 's/getLocaleValue (_NL_ADDRESS_COUNTRY_AB2)/String()/g' {} +
+          
+          # C. Musl usa 'stat' nativamente para 64 bits, no necesita 'stat64' de glibc
+          find . -type f -name "juce_SharedCode_posix.h" -exec sed -i 's/stat64/stat/g' {} +
       
       # 4. Configurar el entorno limpio con CMake
       - name: Configurar CMake

@@ -3,6 +3,9 @@ name: Compilar BespokeSynth para Void Linux (Musl)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-musl:
     runs-on: ubuntu-latest
@@ -14,7 +17,6 @@ jobs:
       # 1. Actualizar el sistema e instalar herramientas de Void Linux
       - name: Instalar herramientas esenciales y dependencias de audio
         run: |
-          # En Void, a veces es necesario correr la actualización dos veces si el gestor xbps se actualiza a sí mismo
           xbps-install -Syu || xbps-install -Syu
           xbps-install -y git cmake gcc make pkg-config python3 python3-devel \
             alsa-lib-devel jack-devel libX11-devel libXrandr-devel \
@@ -65,17 +67,17 @@ jobs:
           cp -r build/Source/BespokeSynth_artefacts/Release/* dist/ || cp -r build/BespokeSynth_artefacts/Release/* dist/ || cp -r build/Source/BespokeSynth_artefacts/* dist/
           tar -czvf bespokesynth-void-musl.tar.gz -C dist .
 
-      # 7. Subir el artefacto a las Actions como respaldo temporal
+      # 7. Subir el artefacto a las Actions como respaldo temporal (No bloqueante)
       - name: Guardar copia en Artifacts
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: BespokeSynth-Void-Musl
-          path: bespokesynth-void-musl.tar.gz
+          path: ${{ github.workspace }}/bespokesynth-void-musl.tar.gz
 
       # 8. Generar el Release público permanente en la portada del repositorio
       - name: Crear Release Público Permanente
         uses: softprops/action-gh-release@v2
-        if: success()
         with:
           tag_name: v${{ github.run_number }}-musl
           name: BespokeSynth Nativo para Musl (Build #${{ github.run_number }})
@@ -84,6 +86,6 @@ jobs:
             ¡No requiere gcompat ni capas de traducción secundarias!
           draft: false
           prerelease: false
-          files: bespokesynth-void-musl.tar.gz
+          files: ${{ github.workspace }}/bespokesynth-void-musl.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

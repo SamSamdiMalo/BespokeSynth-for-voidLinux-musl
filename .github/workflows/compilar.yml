@@ -8,18 +8,19 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: alpine:latest
+      image: ghcr.io/void-linux/void-musl:latest
 
     steps:
-      # 1. Instalar herramientas de compilación y dependencias gráficas de Alpine
+      # 1. Actualizar el sistema e instalar herramientas de Void Linux
       - name: Instalar herramientas esenciales y dependencias de audio
         run: |
-          apk update
-          apk add --no-cache cmake g++ git make python3-dev \
-            alsa-lib-dev jack-dev libx11-dev libxrandr-dev \
-            libxinerama-dev libxcursor-dev freetype-dev curl-dev \
-            nodejs bash libxext-dev libxrender-dev libxi-dev glib-dev \
-            mesa-dev gtk+3.0-dev webkit2gtk-4.1-dev libexecinfo-dev
+          # En Void, a veces es necesario correr la actualización dos veces si el gestor xbps se actualiza a sí mismo
+          xbps-install -Syu || xbps-install -Syu
+          xbps-install -y git cmake gcc make pkg-config python3 \
+            alsa-lib-devel jack-devel libX11-devel libXrandr-devel \
+            libXinerama-devel libXcursor-devel freetype-devel libcurl-devel \
+            nodejs bash libXext-devel libXrender-devel libXi-devel glib-devel \
+            MesaLib-devel gtk+3-devel webkit2gtk-devel libexecinfo-devel
 
       # 2. Clonar el código fuente oficial de BespokeSynth con sus submódulos
       - name: Clonar código fuente y submódulos
@@ -30,7 +31,7 @@ jobs:
       - name: Parchear JUCE para entorno Musl
         run: |
           cd BespokeSynth/libs/JUCE
-          # 1. Evitar que busque sysctl.h (No existe en Musl)
+          # 1. Evitar que busque sysctl.h (No existe en Musl puro)
           find . -type f -name "juce_SystemStats_linux.cpp" -exec sed -i 's/#include <sys\/sysctl.h>/\/\/ #include <sys\/sysctl.h>/g' {} +
       
       # 4. Configurar el entorno limpio con CMake
@@ -70,7 +71,7 @@ jobs:
           tag_name: v${{ github.run_number }}-musl
           name: BespokeSynth Nativo para Musl (Build #${{ github.run_number }})
           body: |
-            Binario nativo de BespokeSynth compilado de forma nativa en un ecosistema Musl puro (Alpine/Void Linux).
+            Binario nativo de BespokeSynth compilado de forma nativa en Void Linux Musl.
             ¡No requiere gcompat ni capas de traducción secundarias!
           draft: false
           prerelease: false

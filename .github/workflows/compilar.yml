@@ -21,7 +21,7 @@ jobs:
             libXinerama-devel libXcursor-devel freetype-devel libcurl-devel \
             nodejs bash libXext-devel libXrender-devel libXi-devel glib-devel \
             MesaLib-devel gtk+3-devel libwebkit2gtk41-devel libexecinfo-devel \
-            findutils sed tar
+            findutils sed tar gzip
 
       # 2. Clonar el código fuente oficial de BespokeSynth con sus submódulos
       - name: Clonar código fuente y submódulos

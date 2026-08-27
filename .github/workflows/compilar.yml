@@ -16,7 +16,7 @@ jobs:
         run: |
           # En Void, a veces es necesario correr la actualización dos veces si el gestor xbps se actualiza a sí mismo
           xbps-install -Syu || xbps-install -Syu
-          xbps-install -y git cmake gcc make pkg-config python3 \
+          xbps-install -y git cmake gcc make pkg-config python3 python3-devel \
             alsa-lib-devel jack-devel libX11-devel libXrandr-devel \
             libXinerama-devel libXcursor-devel freetype-devel libcurl-devel \
             nodejs bash libXext-devel libXrender-devel libXi-devel glib-devel \

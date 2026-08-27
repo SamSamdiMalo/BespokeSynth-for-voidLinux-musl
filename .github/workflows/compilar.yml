@@ -26,13 +26,14 @@ jobs:
         run: |
           git clone --recursive https://github.com/BespokeSynth/BespokeSynth.git
 
-      # 3. PARCHE CRÍTICO MUSL: Forzar la anulación de execinfo.h en JUCE
+      # 3. PARCHE CRÍTICO MUSL: Desactivar execinfo globalmente en JUCE
       - name: Parchear JUCE para entorno Musl
         run: |
-          cd BespokeSynth/libs/JUCE/modules/juce_core
-          # Reemplazamos la condición para que nunca intente cargar execinfo.h si no es glibc
-          sed -i 's/#if JUCE_LINUX \&\& ! JUCE_ANDROID/#if JUCE_LINUX \&\& defined(__GLIBC__)/g' juce_core.cpp
-
+          cd BespokeSynth/libs/JUCE
+          # Reemplazar la inclusión directa de execinfo.h en juce_core
+          find . -type f \( -name "*.cpp" -o -name "*.h" \) -exec sed -i 's/#include <execinfo.h>/ \/\/ #include <execinfo.h>/g' {} +
+          # Desactivar la macro JUCE_HAS_BACKTRACE si existe
+          find . -type f \( -name "*.cpp" -o -name "*.h" \) -exec sed -i 's/defined (__GLIBC__)/0/g' {} +
       # 4. Configurar el entorno limpio con CMake
       - name: Configurar CMake
         run: |

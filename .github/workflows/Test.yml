@@ -16,7 +16,7 @@ jobs:
 
       - name: Ejecutar prueba headless en contenedor Void musl
         run: |
-          docker run --rm -v ${{ github.workspace }}:/workspace voidlinux/voidlinux-musl bash -c "
+          docker run --rm -v ${{ github.workspace }}:/workspace voidlinux/voidlinux-musl sh -c "
             set -e
             echo '=== 1. Actualizando repositorio e instalando Mesa/Xvfb ==='
             xbps-install -Sy mesa-dri pipewire libjack-pipewire xorg-server-xvfb

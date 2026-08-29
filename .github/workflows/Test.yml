@@ -1,0 +1,51 @@
+name: Musl Smoke Test
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test-musl-binary:
+    name: Validar ejecución en Void Linux musl
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar código fuente / artefactos
+        uses: actions/checkout@v4
+
+      - name: Ejecutar prueba headless en contenedor Void musl
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace voidlinux/voidlinux-musl bash -c "
+            set -e
+            echo '=== 1. Actualizando repositorio e instalando Mesa/Xvfb ==='
+            xbps-install -Sy mesa-dri pipewire libjack-pipewire xorg-server-xvfb
+
+            echo '=== 2. Iniciando servidor gráfico virtual Xvfb ==='
+            Xvfb :99 -screen 0 1280x1024x24 &
+            XVFB_PID=\$!
+            export DISPLAY=:99
+            sleep 2
+
+            echo '=== 3. Preparando ejecutable ==='
+            cd /workspace
+            # Ajusta la ruta según cómo se ubique tu binario compilado
+            chmod +x ./BespokeSynth 2>/dev/null || chmod +x ./build/BespokeSynth 2>/dev/null || true
+
+            echo '=== 4. Ejecutando BespokeSynth (Test de 8 segundos) ==='
+            GALLIUM_DRIVER=llvmpipe ./BespokeSynth --dummy-audio &
+            APP_PID=\$!
+
+            sleep 8
+
+            if kill -0 \$APP_PID 2>/dev/null; then
+              echo '✅ ÉXITO: BespokeSynth se ejecutó correctamente en Void Linux musl sin Segmentation Fault.'
+              kill \$APP_PID 2>/dev/null || true
+              kill \$XVFB_PID 2>/dev/null || true
+              exit 0
+            else
+              echo '❌ ERROR: El ejecutable colapsó o se cerró antes de tiempo.'
+              kill \$XVFB_PID 2>/dev/null || true
+              exit 1
+            fi
+          "

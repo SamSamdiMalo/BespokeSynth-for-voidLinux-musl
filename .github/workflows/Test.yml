@@ -14,38 +14,42 @@ jobs:
       - name: Descargar código fuente / artefactos
         uses: actions/checkout@v4
 
-      - name: Ejecutar prueba headless en contenedor Void musl
-        run: |
-          docker run --rm -v ${{ github.workspace }}:/workspace voidlinux/voidlinux-musl sh -c "
-            set -e
-            echo '=== 1. Actualizando repositorio e instalando Mesa/Xvfb ==='
-            xbps-install -Sy mesa-dri pipewire libjack-pipewire xorg-server-xvfb
+- name: Ejecutar prueba headless en contenedor Void musl
+  run: |
+    docker run --rm -v ${{ github.workspace }}:/workspace voidlinux/voidlinux-musl sh -c "
+      set -e
+      echo '=== 0. Arreglando repositorios y certificados SSL ==='
+      mkdir -p /etc/xbps.d
+      echo 'repository=https://repo-default.voidlinux.org/current/musl' > /etc/xbps.d/00-repository-main.conf
+      SSL_NO_VERIFY=1 xbps-install -Syu xbps ca-certificates
 
-            echo '=== 2. Iniciando servidor gráfico virtual Xvfb ==='
-            Xvfb :99 -screen 0 1280x1024x24 &
-            XVFB_PID=\$!
-            export DISPLAY=:99
-            sleep 2
+      echo '=== 1. Instalando dependencias ==='
+      xbps-install -Sy bash mesa-dri pipewire libjack-pipewire xorg-server-xvfb
 
-            echo '=== 3. Preparando ejecutable ==='
-            cd /workspace
-            # Ajusta la ruta según cómo se ubique tu binario compilado
-            chmod +x ./BespokeSynth 2>/dev/null || chmod +x ./build/BespokeSynth 2>/dev/null || true
+      echo '=== 2. Iniciando servidor gráfico virtual Xvfb ==='
+      Xvfb :99 -screen 0 1280x1024x24 &
+      XVFB_PID=\$!
+      export DISPLAY=:99
+      sleep 2
 
-            echo '=== 4. Ejecutando BespokeSynth (Test de 8 segundos) ==='
-            GALLIUM_DRIVER=llvmpipe ./BespokeSynth --dummy-audio &
-            APP_PID=\$!
+      echo '=== 3. Preparando ejecutable ==='
+      cd /workspace
+      chmod +x ./BespokeSynth 2>/dev/null || chmod +x ./build/BespokeSynth 2>/dev/null || true
 
-            sleep 8
+      echo '=== 4. Ejecutando BespokeSynth (Test de 8 segundos) ==='
+      GALLIUM_DRIVER=llvmpipe ./BespokeSynth --dummy-audio &
+      APP_PID=\$!
 
-            if kill -0 \$APP_PID 2>/dev/null; then
-              echo '✅ ÉXITO: BespokeSynth se ejecutó correctamente en Void Linux musl sin Segmentation Fault.'
-              kill \$APP_PID 2>/dev/null || true
-              kill \$XVFB_PID 2>/dev/null || true
-              exit 0
-            else
-              echo '❌ ERROR: El ejecutable colapsó o se cerró antes de tiempo.'
-              kill \$XVFB_PID 2>/dev/null || true
-              exit 1
-            fi
-          "
+      sleep 8
+
+      if kill -0 \$APP_PID 2>/dev/null; then
+        echo '✅ ÉXITO: BespokeSynth se ejecutó correctamente.'
+        kill \$APP_PID 2>/dev/null || true
+        kill \$XVFB_PID 2>/dev/null || true
+        exit 0
+      else
+        echo '❌ ERROR: El ejecutable colapsó o se cerró antes de tiempo.'
+        kill \$XVFB_PID 2>/dev/null || true
+        exit 1
+      fi
+    "

@@ -11,19 +11,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Descargar código fuente / artefactos
+      - name: Descargar código fuente del repositorio
         uses: actions/checkout@v4
 
-      - name: Ejecutar prueba headless en contenedor Void musl
+      - name: Descargar el último release y ejecutar prueba en contenedor Void musl
         run: |
-          docker run --rm -v ${{ github.workspace }}:/workspace voidlinux/voidlinux-musl sh -c "
+          # 1. Crear directorio temporal para la prueba
+          mkdir -p test_env
+          
+          echo "=== 📥 Descargando el último release desde GitHub ==="
+          # Usamos la API de GitHub para obtener la URL del tar.gz del último release de este repo
+          REPO="${{ github.repository }}"
+          TARBALL_URL=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep "browser_download_url" | grep ".tar.gz" | cut -d '"' -f 4 | head -n 1)
+          
+          if [ -z "$TARBALL_URL" ]; then
+            echo "⚠️ No se encontró un tar.gz en el último release 'latest'. Intentando descargar desde tags..."
+            TARBALL_URL=$(curl -s "https://api.github.com/repos/$REPO/releases" | grep "browser_download_url" | grep ".tar.gz" | cut -d '"' -f 4 | head -n 1)
+          fi
+
+          if [ -z "$TARBALL_URL" ]; then
+            echo "❌ Error: No se pudo encontrar ningún tar.gz adjunto en los Releases de este repositorio."
+            exit 1
+          fi
+
+          echo "🔗 Descargando desde: $TARBALL_URL"
+          curl -L -o test_env/bespoke.tar.gz "$TARBALL_URL"
+
+          # 2. Ejecutar el contenedor de Void Linux con el tarball descargado
+          docker run --rm -v ${{ github.workspace }}/test_env:/workspace voidlinux/voidlinux-musl sh -c "
             set -e
             echo '=== 0. Arreglando repositorios y certificados SSL ==='
             mkdir -p /etc/xbps.d
             echo 'repository=https://repo-default.voidlinux.org/current/musl' > /etc/xbps.d/00-repository-main.conf
             SSL_NO_VERIFY=1 xbps-install -Syu xbps ca-certificates
 
-            echo '=== 1. Instalando dependencias (incluyendo tar) ==='
+            echo '=== 1. Instalando dependencias (tar, mesa, pipewire) ==='
             xbps-install -Sy bash mesa-dri pipewire libjack-pipewire xorg-server-xvfb tar findutils gzip
 
             echo '=== 2. Iniciando servidor gráfico virtual Xvfb ==='
@@ -32,18 +54,10 @@ jobs:
             export DISPLAY=:99
             sleep 2
 
-            echo '=== 3. Localizando y descomprimiendo el tar.gz ==='
+            echo '=== 3. Descomprimiendo el Release ==='
             cd /workspace
-            TARBALL=\$(find . -maxdepth 2 -name \"*.tar.gz\" | head -n 1)
-            
-            if [ -z \"\$TARBALL\" ]; then
-              echo \"❌ No se encontró ningún archivo .tar.gz en el repositorio.\"
-              exit 1
-            fi
-            
-            echo \"📦 Descomprimiendo: \$TARBALL\"
             mkdir -p extracted_app
-            tar -xzf \"\$TARBALL\" -C extracted_app
+            tar -xzf bespoke.tar.gz -C extracted_app
             
             BINARY=\$(find extracted_app -name \"BespokeSynth\" -type f -executable | head -n 1)
             
